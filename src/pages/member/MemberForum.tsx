@@ -27,13 +27,13 @@ export default function MemberForum() {
     ? threads
     : threads.filter((t) => t.category === selectedCategory);
 
-  const handlePost = () => {
+  const handlePost = async () => {
     if (!newTitle.trim() || !newContent.trim()) {
       toast.error("Please fill in both title and content.");
       return;
     }
     
-    addThread(newTitle, newContent, postCategory, user?.name || "Anonymous");
+    await addThread(newTitle, newContent, postCategory, user?.name || "Anonymous", user?.id);
     setShowNewPost(false);
     setNewTitle("");
     setNewContent("");

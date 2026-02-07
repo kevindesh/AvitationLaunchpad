@@ -35,7 +35,9 @@ export default function ThreadDetail() {
   const [editTitle, setEditTitle] = useState("");
   const [editContent, setEditContent] = useState("");
 
-  const thread = threads.find(t => t.id === Number(threadId));
+  // Convert threadId to number or string based on thread type
+  // Supabase IDs are UUID strings, Legacy are numbers.
+  const thread = threads.find(t => String(t.id) === String(threadId));
 
   // Initialize edit form when opening edit mode
   const startEditing = () => {

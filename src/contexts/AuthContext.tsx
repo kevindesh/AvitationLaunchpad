@@ -1,6 +1,7 @@
-import React, { createContext, useContext, useState, useCallback } from "react";
+import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
 import { jwtDecode } from "jwt-decode";
 import { toast } from "sonner";
+import { supabase } from "@/lib/supabase";
 
 interface User {
   id: string;
@@ -21,115 +22,127 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const LOCAL_STORAGE_USERS_KEY = "aviation_users_db";
-const LOCAL_STORAGE_CURRENT_USER_KEY = "aviation_current_user";
-
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(() => {
-    const saved = localStorage.getItem(LOCAL_STORAGE_CURRENT_USER_KEY);
-    return saved ? JSON.parse(saved) : null;
-  });
+  const [user, setUser] = useState<User | null>(null);
 
-  const saveUserAndLogin = (userData: User) => {
-    // Save to current session
-    localStorage.setItem(LOCAL_STORAGE_CURRENT_USER_KEY, JSON.stringify(userData));
-    setUser(userData);
-    
-    // Save/Update in "Database"
-    const usersRaw = localStorage.getItem(LOCAL_STORAGE_USERS_KEY);
-    const users: User[] = usersRaw ? JSON.parse(usersRaw) : [];
-    const existingIndex = users.findIndex(u => u.email === userData.email);
-    
-    if (existingIndex >= 0) {
-      users[existingIndex] = userData;
-    } else {
-      users.push(userData);
+  useEffect(() => {
+    // Check active session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        setUser({
+          id: session.user.id,
+          email: session.user.email!,
+          name: session.user.user_metadata.name || session.user.email?.split("@")[0] || "",
+          role: session.user.user_metadata.role || "member",
+          phoneNumber: session.user.user_metadata.phone_number
+        });
+      }
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session) {
+         setUser({
+          id: session.user.id,
+          email: session.user.email!,
+          name: session.user.user_metadata.name || session.user.email?.split("@")[0] || "",
+          role: session.user.user_metadata.role || "member",
+          phoneNumber: session.user.user_metadata.phone_number
+        });
+      } else {
+        setUser(null);
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const login = useCallback(async (email: string, password: string): Promise<{ error?: string }> => {
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (error) {
+       return { error: error.message };
     }
-    localStorage.setItem(LOCAL_STORAGE_USERS_KEY, JSON.stringify(users));
-  };
-
-  const login = useCallback(async (email: string, _password: string): Promise<{ error?: string }> => {
-    // Simple mock check against local DB
-    const usersRaw = localStorage.getItem(LOCAL_STORAGE_USERS_KEY);
-    const users: User[] = usersRaw ? JSON.parse(usersRaw) : [];
-    const foundUser = users.find(u => u.email === email);
-
-    if (foundUser) {
-      localStorage.setItem(LOCAL_STORAGE_CURRENT_USER_KEY, JSON.stringify(foundUser));
-      setUser(foundUser);
-      return {};
-    }
-    
-    // Fallback for "demo" (if not found, create implicit member for now to not break existing flow totally, or just error)
-    // For specific request, we want to prevent duplicates/mismatches. 
-    return { error: "User not found. Please register first." }; 
+    return {};
   }, []);
 
   const loginWithGoogle = useCallback(async (credential: string, role?: User["role"], customName?: string, phoneNumber?: string): Promise<{ error?: string }> => {
-    try {
-      const decoded: any = jwtDecode(credential);
-      const email = decoded.email;
-      
-      const usersRaw = localStorage.getItem(LOCAL_STORAGE_USERS_KEY);
-      const users: User[] = usersRaw ? JSON.parse(usersRaw) : [];
-      const existingUser = users.find(u => u.email === email);
-
-      // SCENARIO 1: Registration (Role is provided)
-      if (role) {
-        if (existingUser) {
-          return { error: "Account already exists. Please sign in instead." };
-        }
-        
-        // Create new user
-        const newUser: User = {
-          id: decoded.sub || `g-${Date.now()}`,
-          email,
-          name: customName || decoded.name || email.split("@")[0],
-          role: role,
-          phoneNumber
-        };
-        saveUserAndLogin(newUser);
-        return {};
-      }
-
-      // SCENARIO 2: Sign In (No role provided)
-      if (existingUser) {
-        localStorage.setItem(LOCAL_STORAGE_CURRENT_USER_KEY, JSON.stringify(existingUser));
-        setUser(existingUser);
-        return {};
-      } else {
-        return { error: "Account not found. Please register first." };
-      }
-
-    } catch (error) {
-      console.error("Google login error:", error);
-      return { error: "Failed to process Google login" };
-    }
+     // NOTE: This existing function used 'credential' from a specific library (likely @react-oauth/google).
+     // Supabase handles Google Auth differently (via redirection).
+     // To keep it simple, we will reuse the existing flow but just sign in normally if possible, 
+     // or instruct the user that we are switching to Supabase Auth.
+     
+     // However, for now, we will just simulate the existing behavior but utilizing Supabase if possible.
+     // Actually, Supabase Google Auth requires redirect. The existing code takes an ID Token (`credential`).
+     
+     // To use Supabase correctly, we should use `supabase.auth.signInWithOAuth`.
+     // But that breaks the UI flow (requires redirect).
+     
+     // Alternative: Exchange the Google ID Token for a Supabase Session (IdToken grant).
+     const { data, error } = await supabase.auth.signInWithIdToken({
+        provider: 'google',
+        token: credential,
+     });
+     
+     if (error) {
+        return { error: error.message };
+     }
+     
+     // If registering (first time), update metadata
+     if (role && data.user) {
+        await supabase.auth.updateUser({
+           data: {
+             role,
+             name: customName || data.user.user_metadata.name,
+             phone_number: phoneNumber
+           }
+        });
+     }
+     
+     return {};
   }, []);
 
-  const register = useCallback(
-    async (email: string, _password: string, name: string, role: User["role"], phoneNumber?: string): Promise<{ error?: string }> => {
-      const usersRaw = localStorage.getItem(LOCAL_STORAGE_USERS_KEY);
-      const users: User[] = usersRaw ? JSON.parse(usersRaw) : [];
-      
-      if (users.find(u => u.email === email)) {
-        return { error: "User already exists" };
+  const register = useCallback(async (email: string, password: string, name: string, role: User["role"], phoneNumber?: string): Promise<{ error?: string }> => {
+    const { error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          name,
+          role,
+          phone_number: phoneNumber
+        }
       }
+    });
 
-      const newUser: User = { id: `u-${Date.now()}`, email, name, role, phoneNumber };
-      saveUserAndLogin(newUser);
-      return {};
-    },
-    []
-  );
+    if (error) {
+      return { error: error.message };
+    }
+    
+    // Auto-login? Supabase signUp usually sends a confirmation email by default.
+    // If "Enable Email Confirmations" is OFF in the dashboard, they are logged in.
+    return {};
+  }, []);
 
-  const logout = useCallback(() => {
-    localStorage.removeItem(LOCAL_STORAGE_CURRENT_USER_KEY);
+  const logout = useCallback(async () => {
+    await supabase.auth.signOut();
     setUser(null);
   }, []);
 
+
   return (
-    <AuthContext.Provider value={{ user, isAuthenticated: !!user, login, loginWithGoogle, register, logout }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        isAuthenticated: !!user,
+        login,
+        loginWithGoogle,
+        register,
+        logout,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
@@ -137,6 +150,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
-  if (!context) throw new Error("useAuth must be used within AuthProvider");
+  if (context === undefined) {
+    throw new Error("useAuth must be used within an AuthProvider");
+  }
   return context;
 };

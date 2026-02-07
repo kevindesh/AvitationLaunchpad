@@ -1,15 +1,16 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { toast } from "sonner";
+import { supabase } from "@/lib/supabase";
 
 export interface Reply {
-  id: number;
+  id: string;
   author: string;
   content: string;
   timestamp: number;
 }
 
 export interface Thread {
-  id: number;
+  id: number | string; // Supabase uses UUIDs (string), LocalStorage used numbers.
   title: string;
   author: string;
   category: string;
@@ -21,155 +22,135 @@ export interface Thread {
 
 interface ForumContextType {
   threads: Thread[];
-  addThread: (title: string, content: string, category: string, author: string) => void;
-  likeThread: (id: number) => void;
-  addReply: (threadId: number, content: string, author: string) => void;
-  deleteThread: (id: number) => void;
-  updateThread: (id: number, title: string, content: string) => void;
+  addThread: (title: string, content: string, category: string, author: string, authorId?: string) => Promise<void>;
+  likeThread: (id: number | string) => Promise<void>;
+  addReply: (threadId: number | string, content: string, author: string) => Promise<void>;
+  deleteThread: (id: number | string) => Promise<void>;
+  updateThread: (id: number | string, title: string, content: string) => Promise<void>;
 }
 
 const ForumContext = createContext<ForumContextType | undefined>(undefined);
 
-const INITIAL_THREADS: Thread[] = [
-  { 
-    id: 1, 
-    title: "Best tips for your first MRO interview?", 
-    author: "Sarah M.", 
-    category: "Career Advice", 
-    likes: 8, 
-    content: "I have my first MRO interview next week with Jazz Aviation. Any tips from people who've been through it?", 
-    timestamp: Date.now() - 86400000,
-    replies: [
-      { id: 101, author: "John D.", content: "Be prepared to talk about Human Factors. They love that.", timestamp: Date.now() - 80000000 },
-      { id: 102, author: "Mike T.", content: "Dress sharp and bring your logbook!", timestamp: Date.now() - 75000000 }
-    ]
-  },
-  { 
-    id: 2, 
-    title: "M2 license study group — who's in?", 
-    author: "James R.", 
-    category: "Study Groups", 
-    likes: 5, 
-    content: "Looking for people studying for their M2. I'm in Ontario and would love to set up a virtual study group.", 
-    timestamp: Date.now() - 172800000,
-    replies: []
-  },
-  { 
-    id: 3, 
-    title: "Just landed my first job at Jazz Aviation!", 
-    author: "Priya K.", 
-    category: "General Discussion", 
-    likes: 31, 
-    content: "After 3 months of applying, I finally got the call! Thanks to everyone here who helped with my resume and interview prep.", 
-    timestamp: Date.now() - 259200000,
-    replies: [
-      { id: 301, author: "Sarah M.", content: "Congrats!! That's huge.", timestamp: Date.now() - 250000000 }
-    ]
-  },
-  { 
-    id: 4, 
-    title: "What tools should a new AME carry?", 
-    author: "Mike T.", 
-    category: "General Discussion", 
-    likes: 12, 
-    content: "Starting my first job next month. What's the essential toolkit I should bring on day one?", 
-    timestamp: Date.now() - 345600000,
-    replies: []
-  },
-  { 
-    id: 5, 
-    title: "Co-op posting at Bombardier — apply now", 
-    author: "Admin", 
-    category: "Job Leads", 
-    likes: 9, 
-    content: "Bombardier has a new co-op posting for avionics technicians in Montreal. Check the Careers section for details!", 
-    timestamp: Date.now() - 432000000,
-    replies: []
-  },
-];
-
 export const ForumProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [threads, setThreads] = useState<Thread[]>([]);
 
-  // Load from local storage on mount
-  useEffect(() => {
-    const saved = localStorage.getItem("forum_threads");
-    if (saved) {
-      try {
-        const parsed: Thread[] = JSON.parse(saved);
-        // Migration: Ensure 'replies' array exists and remove the specific unwanted post
-        const patched = parsed
-          .filter(t => t.title !== "Need help sososo") // REMOVE UNWANTED POST
-          .map(t => ({
-            ...t,
-            replies: Array.isArray(t.replies) ? t.replies : []
-          }));
-        setThreads(patched);
-      } catch (e) {
-        setThreads(INITIAL_THREADS);
-      }
-    } else {
-      setThreads(INITIAL_THREADS);
+  // Fetch threads from Supabase
+  const fetchThreads = async () => {
+    const { data, error } = await supabase
+      .from('threads')
+      .select('*')
+      .order('timestamp', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching threads:', error);
+      // Fallback or empty if table doesn't exist yet
+      return; 
     }
+
+    if (data) {
+      setThreads(data);
+    }
+  };
+
+  useEffect(() => {
+    fetchThreads();
+    
+    // Subscribe to changes
+    const channel = supabase
+      .channel('public:threads')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'threads' }, () => {
+        fetchThreads();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
-  // Save to local storage whenever threads change
-  useEffect(() => {
-    if (threads.length > 0) {
-      localStorage.setItem("forum_threads", JSON.stringify(threads));
+  const addThread = async (title: string, content: string, category: string, author: string, authorId?: string) => {
+    if (!authorId) {
+        // Fallback for demo if no real auth (shouldn't happen now)
+        console.error("No Author ID provided for thread");
+        return;
     }
-  }, [threads]);
 
-  const addThread = (title: string, content: string, category: string, author: string) => {
-    const newThread: Thread = {
-      id: Date.now(),
+    const newThread = {
       title,
       content,
       category,
-      author,
+      author,     // Display name
+      author_id: authorId, // Link to auth.users
       likes: 0,
       timestamp: Date.now(),
       replies: []
     };
-    setThreads([newThread, ...threads]);
-    toast.success("Post published to the forum!");
+
+    const { error } = await supabase.from('threads').insert([newThread]);
+
+    if (error) {
+       console.error("Error creating thread:", error);
+       toast.error("Failed to create post. Database might not be set up.");
+    } else {
+       toast.success("Discussion posted!");
+    }
   };
 
-  const likeThread = (id: number) => {
-    setThreads(threads.map(t => t.id === id ? { ...t, likes: t.likes + 1 } : t));
+  const deleteThread = async (id: number | string) => {
+    const { error } = await supabase.from('threads').delete().eq('id', id);
+    if (error) {
+        toast.error("Failed to delete thread");
+    } else {
+        toast.success("Thread deleted");
+    }
   };
 
-  const addReply = (threadId: number, content: string, author: string) => {
-    setThreads(threads.map(t => {
-      if (t.id === threadId) {
-        return {
-          ...t,
-          replies: [
-            ...(t.replies || []),
-            {
-              id: Date.now(),
-              content,
-              author,
-              timestamp: Date.now()
-            }
-          ]
-        };
-      }
-      return t;
-    }));
-    toast.success("Reply posted!");
+  const updateThread = async (id: number | string, title: string, content: string) => {
+    const { error } = await supabase.from('threads').update({ title, content }).eq('id', id);
+    if (error) {
+        toast.error("Failed to update thread");
+    } else {
+        toast.success("Thread updated");
+    }
   };
 
-  const deleteThread = (id: number) => {
-    setThreads(prev => prev.filter(t => t.id !== id));
-    toast.success("Thread deleted.");
+  const likeThread = async (id: number | string) => {
+     // Naive implementation: Fetch current, increment, update.
+     // Better: Postgres Function or RPC. Keeping it simple for now.
+     const thread = threads.find(t => t.id === id);
+     if (!thread) return;
+
+     const { error } = await supabase
+        .from('threads')
+        .update({ likes: thread.likes + 1 })
+        .eq('id', id);
+
+     if (error) toast.error("Failed to like");
   };
 
-  const updateThread = (id: number, title: string, content: string) => {
-    setThreads(prev => prev.map(t => 
-      t.id === id ? { ...t, title, content } : t
-    ));
-    toast.success("Thread updated successfully.");
+  const addReply = async (threadId: number | string, content: string, author: string) => {
+    const thread = threads.find(t => t.id === threadId);
+    if (!thread) return;
+
+    const newReply: Reply = {
+      id: crypto.randomUUID(),
+      author,
+      content,
+      timestamp: Date.now()
+    };
+    
+    const updatedReplies = [...(thread.replies || []), newReply];
+
+    const { error } = await supabase
+      .from('threads')
+      .update({ replies: updatedReplies })
+      .eq('id', threadId);
+
+    if (error) {
+        toast.error("Failed to post reply");
+    } else {
+        toast.success("Reply posted!");
+    }
   };
 
   return (
@@ -184,3 +165,4 @@ export const useForum = () => {
   if (!context) throw new Error("useForum must be used within ForumProvider");
   return context;
 };
+
