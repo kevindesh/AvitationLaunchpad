@@ -24,6 +24,8 @@ interface ForumContextType {
   addThread: (title: string, content: string, category: string, author: string) => void;
   likeThread: (id: number) => void;
   addReply: (threadId: number, content: string, author: string) => void;
+  deleteThread: (id: number) => void;
+  updateThread: (id: number, title: string, content: string) => void;
 }
 
 const ForumContext = createContext<ForumContextType | undefined>(undefined);
@@ -95,11 +97,13 @@ export const ForumProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     if (saved) {
       try {
         const parsed: Thread[] = JSON.parse(saved);
-        // Migration: Ensure 'replies' array exists for older data
-        const patched = parsed.map(t => ({
-          ...t,
-          replies: Array.isArray(t.replies) ? t.replies : []
-        }));
+        // Migration: Ensure 'replies' array exists and remove the specific unwanted post
+        const patched = parsed
+          .filter(t => t.title !== "Need help sososo") // REMOVE UNWANTED POST
+          .map(t => ({
+            ...t,
+            replies: Array.isArray(t.replies) ? t.replies : []
+          }));
         setThreads(patched);
       } catch (e) {
         setThreads(INITIAL_THREADS);
@@ -156,8 +160,20 @@ export const ForumProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     toast.success("Reply posted!");
   };
 
+  const deleteThread = (id: number) => {
+    setThreads(prev => prev.filter(t => t.id !== id));
+    toast.success("Thread deleted.");
+  };
+
+  const updateThread = (id: number, title: string, content: string) => {
+    setThreads(prev => prev.map(t => 
+      t.id === id ? { ...t, title, content } : t
+    ));
+    toast.success("Thread updated successfully.");
+  };
+
   return (
-    <ForumContext.Provider value={{ threads, addThread, likeThread, addReply }}>
+    <ForumContext.Provider value={{ threads, addThread, likeThread, addReply, deleteThread, updateThread }}>
       {children}
     </ForumContext.Provider>
   );

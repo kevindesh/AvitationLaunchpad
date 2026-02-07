@@ -59,7 +59,7 @@ export default function Forum() {
                       <p className="text-xs text-muted-foreground">by {thread.author} in {thread.category}</p>
                     </div>
                   </div>
-                  <span className="text-xs text-muted-foreground shrink-0">{thread.replies} replies</span>
+                  <span className="text-xs text-muted-foreground shrink-0">{(thread.replies || []).length} replies</span>
                 </CardContent>
               </Card>
             ))}

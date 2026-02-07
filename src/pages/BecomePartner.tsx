@@ -78,8 +78,10 @@ export default function BecomePartner() {
                 Whether you're an employer, MRO, school, or industry organization — we'd love to explore how we can work together.
               </p>
               <div className="flex flex-wrap justify-center gap-4">
-                <Button variant="gold" size="lg">
-                  <Mail className="h-4 w-4" /> Get in Touch
+                <Button asChild variant="gold" size="lg">
+                  <Link to="/contact">
+                    <Mail className="h-4 w-4 mr-2" /> Get in Touch
+                  </Link>
                 </Button>
                 <Button asChild variant="outline" size="lg">
                   <Link to="/partners">View Current Partners <ArrowRight className="h-4 w-4" /></Link>

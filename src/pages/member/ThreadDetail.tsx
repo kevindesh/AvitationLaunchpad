@@ -5,8 +5,9 @@ import { useForum } from "@/contexts/ForumContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, MessageSquare, ThumbsUp, Send, User } from "lucide-react";
+import { ArrowLeft, MessageSquare, ThumbsUp, Send, User, Trash2, Edit2, X, Save } from "lucide-react";
 import { toast } from "sonner";
 
 // Simple time formatter instead of date-fns to avoid dependency issues
@@ -26,10 +27,35 @@ export default function ThreadDetail() {
   const { threadId } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { threads, likeThread, addReply } = useForum();
+  const { threads, likeThread, addReply, deleteThread, updateThread } = useForum();
   const [replyContent, setReplyContent] = useState("");
+  
+  // Edit State
+  const [isEditing, setIsEditing] = useState(false);
+  const [editTitle, setEditTitle] = useState("");
+  const [editContent, setEditContent] = useState("");
 
   const thread = threads.find(t => t.id === Number(threadId));
+
+  // Initialize edit form when opening edit mode
+  const startEditing = () => {
+    if (thread) {
+      setEditTitle(thread.title);
+      setEditContent(thread.content);
+      setIsEditing(true);
+    }
+  };
+
+  const handleUpdate = () => {
+     if (!editTitle.trim() || !editContent.trim()) {
+       toast.error("Title and content cannot be empty");
+       return;
+     }
+     if (thread) {
+       updateThread(thread.id, editTitle, editContent);
+       setIsEditing(false);
+     }
+  };
 
   if (!thread) {
     return (
@@ -50,6 +76,13 @@ export default function ThreadDetail() {
     setReplyContent("");
   };
 
+  const handleDelete = () => {
+    if (window.confirm("Are you sure you want to delete this thread?")) {
+      deleteThread(thread.id);
+      navigate("/member/forum");
+    }
+  };
+
   return (
     <section className="section-padding bg-background min-h-screen">
       <div className="container max-w-4xl mx-auto">
@@ -65,14 +98,54 @@ export default function ThreadDetail() {
                 <User className="h-6 w-6 text-primary" />
               </div>
               <div className="flex-1">
-                <div className="flex items-center gap-2 mb-2">
-                  <Badge variant="secondary">{thread.category}</Badge>
-                  <span className="text-xs text-muted-foreground">
-                    Posted {formatTimeAgo(thread.timestamp)}
-                  </span>
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <Badge variant="secondary">{thread.category}</Badge>
+                    <span className="text-xs text-muted-foreground">
+                      Posted {formatTimeAgo(thread.timestamp)}
+                    </span>
+                  </div>
+                  {user?.name === thread.author && !isEditing && (
+                     <div className="flex gap-2">
+                       <Button variant="ghost" size="sm" onClick={startEditing} className="h-8 text-muted-foreground hover:text-primary hover:bg-primary/10">
+                         <Edit2 className="h-4 w-4 mr-1" /> Edit
+                       </Button>
+                       <Button variant="ghost" size="sm" onClick={handleDelete} className="h-8 text-destructive hover:text-destructive hover:bg-destructive/10">
+                         <Trash2 className="h-4 w-4 mr-1" /> Delete
+                       </Button>
+                     </div>
+                  )}
                 </div>
-                <h1 className="text-2xl md:text-3xl font-bold text-foreground mb-4">{thread.title}</h1>
-                <p className="text-foreground/90 whitespace-pre-wrap leading-relaxed mb-6">{thread.content}</p>
+
+                {isEditing ? (
+                  <div className="space-y-4 mb-6">
+                    <Input 
+                      value={editTitle} 
+                      onChange={(e) => setEditTitle(e.target.value)} 
+                      className="text-lg font-bold"
+                      placeholder="Post Title"
+                    />
+                    <Textarea 
+                      value={editContent} 
+                      onChange={(e) => setEditContent(e.target.value)} 
+                      className="min-h-[200px]"
+                      placeholder="Post Content"
+                    />
+                    <div className="flex justify-end gap-2">
+                      <Button variant="outline" size="sm" onClick={() => setIsEditing(false)}>
+                        <X className="h-4 w-4 mr-1" /> Cancel
+                      </Button>
+                      <Button variant="gold" size="sm" onClick={handleUpdate}>
+                        <Save className="h-4 w-4 mr-1" /> Save Changes
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <h1 className="text-2xl md:text-3xl font-bold text-foreground mb-4">{thread.title}</h1>
+                    <p className="text-foreground/90 whitespace-pre-wrap leading-relaxed mb-6">{thread.content}</p>
+                  </>
+                )}
                 
                 <div className="flex items-center justify-between border-t pt-4">
                   <div className="flex items-center gap-2">

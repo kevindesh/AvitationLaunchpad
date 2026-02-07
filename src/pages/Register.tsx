@@ -107,6 +107,13 @@ export default function Register() {
                     shape="rectangular"
                   />
                 </div>
+
+                <div className="mt-6 text-center text-sm text-muted-foreground">
+                  Already a member?{" "}
+                  <Link to="/signin" className="text-accent hover:underline font-semibold">
+                    Sign in here
+                  </Link>
+                </div>
               </>
             )}
 
