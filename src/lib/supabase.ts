@@ -8,6 +8,6 @@ if (!supabaseUrl || !supabaseKey) {
 }
 
 export const supabase = createClient(
-  supabaseUrl || "https://placeholder-url.supabase.co", 
-  supabaseKey || "placeholder-key"
+  supabaseUrl || "https://hkxlvknfrbpzddnluywu.supabase.co", 
+  supabaseKey || "sb_publishable_zBd-ou5O0x4YsuxZGSzFtg_A_Eh4ato"
 );
