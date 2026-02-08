@@ -37,51 +37,54 @@ const queryClient = new QueryClient();
 // REPLACE THIS WITH YOUR ACTUAL GOOGLE CLIENT ID
 const GOOGLE_CLIENT_ID = "851418683716-95rc76lslvatjf840l5ta349v5fbfq5i.apps.googleusercontent.com";
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
-      <AuthProvider>
-        <ForumProvider>
-          <TooltipProvider>
-            <Toaster />
-            <Sonner />
-            <BrowserRouter>
-              <ScrollToTop />
-              <Routes>
-            {/* Public routes with shared layout */}
-            <Route element={<PublicLayout />}>
-              <Route path="/" element={<Index />} />
-              <Route path="/about" element={<AboutUs />} />
-              <Route path="/contact" element={<ContactUs />} />
-              <Route path="/events/upcoming" element={<UpcomingEvents />} />
-              <Route path="/events/past" element={<PastEvents />} />
-              <Route path="/partners" element={<Partners />} />
-              <Route path="/become-sponsor" element={<BecomeSponsor />} />
-              <Route path="/become-partner" element={<BecomePartner />} />
-              <Route path="/forum" element={<Forum />} />
-            </Route>
+function App() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
+        <AuthProvider>
+          <ForumProvider>
+            <TooltipProvider>
+              <Toaster />
+              <Sonner />
+              <BrowserRouter>
+                <ScrollToTop />
+                <Routes>
+                  {/* Public routes with shared layout */}
+                  <Route element={<PublicLayout />}>
+                    <Route path="/" element={<Index />} />
+                    <Route path="/about" element={<AboutUs />} />
+                    <Route path="/contact" element={<ContactUs />} />
+                    <Route path="/events/upcoming" element={<UpcomingEvents />} />
+                    <Route path="/events/past" element={<PastEvents />} />
+                    <Route path="/partners" element={<Partners />} />
+                    <Route path="/become-sponsor" element={<BecomeSponsor />} />
+                    <Route path="/become-partner" element={<BecomePartner />} />
+                    <Route path="/forum" element={<Forum />} />
+                  </Route>
 
-            {/* Auth pages (no shared layout) */}
-            <Route path="/register" element={<Register />} />
-            <Route path="/signin" element={<SignIn />} />
+                  {/* Auth pages (no shared layout) */}
+                  <Route path="/register" element={<Register />} />
+                  <Route path="/signin" element={<SignIn />} />
 
-            {/* Member routes (protected) */}
-            <Route element={<MemberLayout />}>
-              <Route path="/member" element={<MemberDashboard />} />
-              <Route path="/member/training" element={<Training />} />
-              <Route path="/member/careers" element={<Careers />} />
-              <Route path="/member/forum" element={<MemberForum />} />
-              <Route path="/member/forum/:threadId" element={<ThreadDetail />} />
-            </Route>
+                  {/* Member routes (protected) */}
+                  <Route element={<MemberLayout />}>
+                    <Route path="/member" element={<MemberDashboard />} />
+                    <Route path="/member/training" element={<Training />} />
+                    <Route path="/member/careers" element={<Careers />} />
+                    <Route path="/member/forum" element={<MemberForum />} />
+                    <Route path="/member/forum/:threadId" element={<ThreadDetail />} />
+                  </Route>
 
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </BrowserRouter>
-      </TooltipProvider>
-      </ForumProvider>
-      </AuthProvider>
-    </GoogleOAuthProvider>
-  </QueryClientProvider>
-);
+                  <Route path="*" element={<NotFound />} />
+                </Routes>
+              </BrowserRouter>
+            </TooltipProvider>
+          </ForumProvider>
+          </AuthProvider>
+        </GoogleOAuthProvider>
+      </QueryClientProvider>
+    </>
+  );
+}
 
 export default App;
