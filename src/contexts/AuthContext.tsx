@@ -80,21 +80,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
      }
      
      if (data.user) {
-        const createdAt = new Date(data.user.created_at).getTime();
-        const now = Date.now();
-        const isNewUser = (now - createdAt) < 10000; // 10 seconds threshold
+        // We rely strictly on the presence of a 'role' in metadata to determine if a user 
+        // is fully registered.
+        // - New Google Signins have NO role.
+        // - Registered users HAVE a role.
+        const hasRole = data.user.user_metadata?.role;
         
-        // Scenario 1: Registration Flow (Role provided)
+        // Scenario 1: Registration Flow (Input 'role' is provided from the Register form)
         if (role) {
-            const hasRole = data.user.user_metadata?.role;
-            
-            // If account exists AND has a role, it's a duplicate registration
-            if (!isNewUser && hasRole) {
+            // If the user already has a role, they are already registered. Block them.
+            if (hasRole) {
                 await supabase.auth.signOut();
                 return { error: "Account already exists. Please sign in." };
             }
             
-            // If new user OR incomplete profile (no role), update metadata
+            // If they don't have a role (New user or Incomplete profile) -> Update & Allow.
             await supabase.auth.updateUser({
                data: {
                  role,
@@ -103,15 +103,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                }
             });
         } 
-        // Scenario 2: Login Flow (No role provided)
+        // Scenario 2: Login Flow (No 'role' argument provided)
         else {
-             // If account was just created implicitly or has no role
-             const hasRole = data.user.user_metadata?.role;
-             
-             if (isNewUser || !hasRole) {
+             // If the user attempts to login but has NO role, they never blindly registered.
+             // We block them to prevent "Login without account".
+             if (!hasRole) {
                  await supabase.auth.signOut();
                  return { error: "No account found. Please register first." };
              }
+             // If they have a role, they are a valid user. Allow login.
         }
      }
      
