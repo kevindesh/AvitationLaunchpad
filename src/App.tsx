@@ -81,11 +81,10 @@ function App() {
               </BrowserRouter>
             </TooltipProvider>
           </ForumProvider>
-          </AuthProvider>
+        </AuthProvider>
         </GoogleOAuthProvider>
       </QueryClientProvider>
-    </>
-  );
+    );
 }
 
 export default App;
