@@ -51,7 +51,13 @@ export default function Register() {
 
     setLoading(true);
     // Generate username format: FirstName. LastInitial (e.g. Kevin. S)
-    const formattedUsername = `${firstName}. ${lastName.charAt(0)}`;
+    const cleanFirstName = firstName.trim();
+    const cleanLastName = lastName.trim();
+    // Ensure proper capitalization for consistent display
+    const formattedFirstName = cleanFirstName.charAt(0).toUpperCase() + cleanFirstName.slice(1);
+    const formattedLastInitial = cleanLastName.charAt(0).toUpperCase();
+    
+    const formattedUsername = `${formattedFirstName}. ${formattedLastInitial}`;
     
     const result = await loginWithGoogle(googleCredential, role, formattedUsername, phone);
     setLoading(false);
