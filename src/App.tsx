@@ -32,6 +32,7 @@ import ThreadDetail from "./pages/member/ThreadDetail";
 
 import NotFound from "./pages/NotFound";
 
+// Ensure queryClient is created outside component or inside a useMemo
 const queryClient = new QueryClient();
 
 // REPLACE THIS WITH YOUR ACTUAL GOOGLE CLIENT ID
