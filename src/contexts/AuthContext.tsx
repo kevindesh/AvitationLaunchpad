@@ -124,23 +124,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return { error: error.message };
     }
     
-    // Check for existing user in "Fake Success" mode (Confirm Email enabled)
-    if (data.user && !data.session) {
-        if (data.user.identities && data.user.identities.length === 0) {
-             return { error: "Account already exists. Please sign in." };
-        }
-    }
-
     // Check if user already exists (strictly via timestamps)
-    // If it's a new user, created_at and last_sign_in_at are nearly identical.
-    // If it's an existing user logging in via signUp, last_sign_in_at is newer.
-    if (data.user && data.session && data.user.last_sign_in_at) {
-       const createdAt = new Date(data.user.created_at).getTime();
-       const lastSignIn = new Date(data.user.last_sign_in_at).getTime();
+    // If it's a new user, created_at should be very close to NOW.
+    if (data.user) {
+       // Check 1: Identities array is empty (Supabase signal for duplicate email)
+       if (data.user.identities && data.user.identities.length === 0) {
+           return { error: "Account already exists. Please sign in." };
+       }
 
-       // If last sign in is more than 500ms after creation, it's an existing user
-       if (lastSignIn - createdAt > 500) {
-           await supabase.auth.signOut();
+       // Check 2: Creation time vs Current time
+       const createdAt = new Date(data.user.created_at).getTime();
+       const now = Date.now();
+
+       // If account is older than 5 seconds, it is an existing account.
+       // (New accounts are created at the moment of request)
+       if (now - createdAt > 5000) {
+           if (data.session) await supabase.auth.signOut();
            return { error: "Account already exists. Please sign in." };
        }
     }
