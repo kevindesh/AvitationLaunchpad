@@ -12,17 +12,14 @@ This project serves as a launchpad for aviation-related resources and tools.
 * npm
 
 ### Installation
-1. Clone the repository:
-   ```bash
-   git clone <repository-url>
-   ```
+1. Clone the repository
 2. Install dependencies:
    ```bash
    npm install
    ```
 
 ### Scripts
-* `npm start`: Runs the app in development mode.
+* `npm start` or `npm run dev`: Runs the app in development mode.
 * `npm run build`: Builds the app for production.
 
 ## License
