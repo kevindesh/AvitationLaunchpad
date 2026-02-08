@@ -69,18 +69,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const loginWithGoogle = useCallback(async (credential: string, role?: User["role"], customName?: string, phoneNumber?: string): Promise<{ error?: string }> => {
-     // NOTE: This existing function used 'credential' from a specific library (likely @react-oauth/google).
-     // Supabase handles Google Auth differently (via redirection).
-     // To keep it simple, we will reuse the existing flow but just sign in normally if possible, 
-     // or instruct the user that we are switching to Supabase Auth.
-     
-     // However, for now, we will just simulate the existing behavior but utilizing Supabase if possible.
-     // Actually, Supabase Google Auth requires redirect. The existing code takes an ID Token (`credential`).
-     
-     // To use Supabase correctly, we should use `supabase.auth.signInWithOAuth`.
-     // But that breaks the UI flow (requires redirect).
-     
-     // Alternative: Exchange the Google ID Token for a Supabase Session (IdToken grant).
+     // Exchange the Google ID Token for a Supabase Session
      const { data, error } = await supabase.auth.signInWithIdToken({
         provider: 'google',
         token: credential,
@@ -90,15 +79,40 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return { error: error.message };
      }
      
-     // If registering (first time), update metadata
-     if (role && data.user) {
-        await supabase.auth.updateUser({
-           data: {
-             role,
-             name: customName || data.user.user_metadata.name,
-             phone_number: phoneNumber
-           }
-        });
+     if (data.user) {
+        const createdAt = new Date(data.user.created_at).getTime();
+        const now = Date.now();
+        const isNewUser = (now - createdAt) < 10000; // 10 seconds threshold
+        
+        // Scenario 1: Registration Flow (Role provided)
+        if (role) {
+            const hasRole = data.user.user_metadata?.role;
+            
+            // If account exists AND has a role, it's a duplicate registration
+            if (!isNewUser && hasRole) {
+                await supabase.auth.signOut();
+                return { error: "Account already exists. Please sign in." };
+            }
+            
+            // If new user OR incomplete profile (no role), update metadata
+            await supabase.auth.updateUser({
+               data: {
+                 role,
+                 name: customName || data.user.user_metadata?.name,
+                 phone_number: phoneNumber
+               }
+            });
+        } 
+        // Scenario 2: Login Flow (No role provided)
+        else {
+             // If account was just created implicitly or has no role
+             const hasRole = data.user.user_metadata?.role;
+             
+             if (isNewUser || !hasRole) {
+                 await supabase.auth.signOut();
+                 return { error: "No account found. Please register first." };
+             }
+        }
      }
      
      return {};
