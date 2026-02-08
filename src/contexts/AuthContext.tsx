@@ -105,7 +105,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const register = useCallback(async (email: string, password: string, name: string, role: User["role"], phoneNumber?: string): Promise<{ error?: string }> => {
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
@@ -118,11 +118,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
 
     if (error) {
+      if (error.message.includes("registered") || error.status === 422) {
+        return { error: "Account already exists. Please sign in." };
+      }
       return { error: error.message };
     }
     
-    // Auto-login? Supabase signUp usually sends a confirmation email by default.
-    // If "Enable Email Confirmations" is OFF in the dashboard, they are logged in.
+    // Check for existing user in "Fake Success" mode (Confirm Email enabled)
+    if (data.user && !data.session) {
+        if (data.user.identities && data.user.identities.length === 0) {
+             return { error: "Account already exists. Please sign in." };
+        }
+    }
+
+    // Check if user already exists (strictly via timestamps)
+    // If it's a new user, created_at and last_sign_in_at are nearly identical.
+    // If it's an existing user logging in via signUp, last_sign_in_at is newer.
+    if (data.user && data.session && data.user.last_sign_in_at) {
+       const createdAt = new Date(data.user.created_at).getTime();
+       const lastSignIn = new Date(data.user.last_sign_in_at).getTime();
+
+       // If last sign in is more than 500ms after creation, it's an existing user
+       if (lastSignIn - createdAt > 500) {
+           await supabase.auth.signOut();
+           return { error: "Account already exists. Please sign in." };
+       }
+    }
+    
     return {};
   }, []);
 
